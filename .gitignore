@@ -1,0 +1,9 @@
+/quickstart/.vs
+/quickstart/src/Api/bin
+/quickstart/src/Api/obj
+/quickstart/src/IdentityServer/bin
+/quickstart/src/IdentityServer/obj
+/quickstart/src/MvcClient/bin
+/quickstart/src/MvcClient/obj
+/quickstart/src/Client/bin
+/quickstart/src/Client/obj
