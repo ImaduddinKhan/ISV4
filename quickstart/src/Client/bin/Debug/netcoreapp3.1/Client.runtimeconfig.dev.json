@@ -1,0 +1,8 @@
+{
+  "runtimeOptions": {
+    "additionalProbingPaths": [
+      "C:\\Users\\emadu\\.dotnet\\store\\|arch|\\|tfm|",
+      "C:\\Users\\emadu\\.nuget\\packages"
+    ]
+  }
+}
