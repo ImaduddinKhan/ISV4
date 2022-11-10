@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authentication.OAuth.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -39,11 +40,25 @@ namespace MvcClient
                     options.Authority = "https://localhost:5001";
                     options.RequireHttpsMetadata = false;
 
-                    options.ClientId = "mvc";
+                    options.ClientId = "mvc.test";
                     options.ClientSecret = "secret";
                     options.ResponseType = "code";
 
                     options.SaveTokens = true;
+
+                    options.Scope.Add("mvc");
+                    options.Scope.Add("api1");
+                    options.Scope.Add("offline_access");
+
+                    options.ClaimActions.Add(new JsonKeyClaimAction("role", null, "role"));
+
+                    options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+                    {
+                        NameClaimType = "name",
+                        RoleClaimType = "role"
+                    };
+
+
                 });
 
         }

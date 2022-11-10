@@ -15,18 +15,20 @@ namespace IdentityServer
             {
                 new IdentityResources.OpenId(),
                 new IdentityResources.Profile(),
+                new IdentityResources.Email(),
             };
 
         public static IEnumerable<ApiScope> ApiScopes =>
         new List<ApiScope>
         {
-            new ApiScope("api1", "My API")
+            new ApiScope("api1", "Api1"),
+            new ApiScope("mvc", "Mvc"),
         };
 
         public static IEnumerable<ApiResource> Apis =>
         new List<ApiResource>
         {
-            new ApiResource("api1", "My API")
+            new ApiResource("api1", "Api1")
         };
 
         public static IEnumerable<Client> Clients =>
@@ -34,7 +36,7 @@ namespace IdentityServer
         {
             new Client
             {
-                ClientId = "client",
+                ClientId = "client_test",
 
                 // no interactive user, use the clientid/secret for authentication
                     AllowedGrantTypes = GrantTypes.ClientCredentials,
@@ -52,7 +54,7 @@ namespace IdentityServer
             // interactive ASP.NET Core MVC client
             new Client
             {
-                ClientId = "mvc",
+                ClientId = "mvc.test",
                 ClientSecrets = { new Secret("secret".Sha256()) },
 
                 AllowedGrantTypes = GrantTypes.Code,
@@ -68,7 +70,10 @@ namespace IdentityServer
                 AllowedScopes = new List<string>
                 {
                     IdentityServerConstants.StandardScopes.OpenId,
-                    IdentityServerConstants.StandardScopes.Profile
+                    IdentityServerConstants.StandardScopes.Profile,
+                    IdentityServerConstants.StandardScopes.Email,
+                    IdentityServerConstants.StandardScopes.OfflineAccess,
+                    "api1",
                 }
             }
         };
