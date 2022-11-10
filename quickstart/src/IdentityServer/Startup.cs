@@ -2,7 +2,9 @@
 // Licensed under the Apache License, Version 2.0. See LICENSE in the project root for license information.
 
 
+using IdentityServer.Certs;
 using IdentityServer.Infrastructure.DB;
+using IdentityServer.Infrastructure.Proxies;
 using IdentityServer.Infrastructure.Services;
 using IdentityServer4.EntityFramework.DbContexts;
 using IdentityServer4.EntityFramework.Mappers;
@@ -66,6 +68,7 @@ namespace IdentityServer
             string configStoreConnectionString = _config["Data:DbContext:ConfigStoreConnectionString"];
             string operationalStoretring = _config["Data:DbContext:OperationStoreConnectionString"];
 
+            var crt = Certificate.Load(_config);
             var builder = services
                 .AddIdentityServer(opt =>
                 {
@@ -74,9 +77,8 @@ namespace IdentityServer
                     opt.AccessTokenJwtType = "JWT";
                     opt.EmitStaticAudienceClaim = true;
                 })
-                //.AddTestUsers(TestUsers.Users)
-                //.AddAspNetIdentity<ApplicationUser>()
-                //.AddSigningCredential(crt)
+                .AddAspNetIdentity<ApplicationUser>()
+                .AddSigningCredential(crt)
                 .AddConfigurationStore(options =>
                 {
                     options.ConfigureDbContext = b => b.UseNpgsql(configStoreConnectionString,
@@ -94,7 +96,7 @@ namespace IdentityServer
             services.AddDataProtection()
                 .SetApplicationName("Hala_IS")
                 .PersistKeysToDbContext<AspNetKeysDbContext>();
-
+            
             services.AddCors(o => o.AddPolicy("AllowAllPolicy", options =>
             {
                 options.AllowAnyOrigin()
@@ -102,6 +104,7 @@ namespace IdentityServer
                        .AllowAnyHeader();
             }));
 
+            services.AddTransient<ICRMProxy, CRMProxy>();
         }
 
         public void Configure(IApplicationBuilder app)

@@ -3,6 +3,9 @@
 
 
 using IdentityModel;
+using IdentityServer.Infrastructure.DB;
+using IdentityServer.Infrastructure.Proxies;
+using IdentityServer.Models;
 using IdentityServer4;
 using IdentityServer4.Events;
 using IdentityServer4.Extensions;
@@ -13,7 +16,9 @@ using IdentityServer4.Test;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -29,27 +34,34 @@ namespace IdentityServerHost.Quickstart.UI
     [AllowAnonymous]
     public class AccountController : Controller
     {
-        private readonly TestUserStore _users;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly IIdentityServerInteractionService _interaction;
         private readonly IClientStore _clientStore;
         private readonly IAuthenticationSchemeProvider _schemeProvider;
         private readonly IEventService _events;
+        private readonly ICRMProxy _CRMProxy;
 
         public AccountController(
+            UserManager<ApplicationUser> userManager, 
+            SignInManager<ApplicationUser> signInManager,
             IIdentityServerInteractionService interaction,
             IClientStore clientStore,
             IAuthenticationSchemeProvider schemeProvider,
             IEventService events,
-            TestUserStore users = null)
+            ICRMProxy cRMProxy)
         {
             // if the TestUserStore is not in DI, then we'll just use the global users collection
             // this is where you would plug in your own custom identity management library (e.g. ASP.NET Identity)
-            _users = users ?? new TestUserStore(TestUsers.Users);
 
             _interaction = interaction;
             _clientStore = clientStore;
             _schemeProvider = schemeProvider;
             _events = events;
+            _CRMProxy = cRMProxy;
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _signInManager = signInManager;
         }
 
         /// <summary>
@@ -110,30 +122,32 @@ namespace IdentityServerHost.Quickstart.UI
             if (ModelState.IsValid)
             {
                 // validate username/password against in-memory store
-                if (_users.ValidateCredentials(model.Username, model.Password))
+                var res = await _signInManager.PasswordSignInAsync("_" + model.PhoneNumber, model.Password, model.RememberLogin, lockoutOnFailure: true);
+                if (res.Succeeded)
                 {
-                    var user = _users.FindByUsername(model.Username);
-                    await _events.RaiseAsync(new UserLoginSuccessEvent(user.Username, user.SubjectId, user.Username, clientId: context?.Client.ClientId));
+                    var user = _userManager.FindByNameAsync("_" + model.PhoneNumber);
+                    if (user != null)
+                    await _events.RaiseAsync(new UserLoginSuccessEvent(user.Result.UserName, user.Result.Id, user.Result.UserName, clientId: context?.Client.ClientId));
 
                     // only set explicit expiration here if user chooses "remember me". 
                     // otherwise we rely upon expiration configured in cookie middleware.
-                    AuthenticationProperties props = null;
-                    if (AccountOptions.AllowRememberLogin && model.RememberLogin)
-                    {
-                        props = new AuthenticationProperties
-                        {
-                            IsPersistent = true,
-                            ExpiresUtc = DateTimeOffset.UtcNow.Add(AccountOptions.RememberMeLoginDuration)
-                        };
-                    };
+                    //AuthenticationProperties props = null;
+                    //if (AccountOptions.AllowRememberLogin && model.RememberLogin)
+                    //{
+                    //    props = new AuthenticationProperties
+                    //    {
+                    //        IsPersistent = true,
+                    //        ExpiresUtc = DateTimeOffset.UtcNow.Add(AccountOptions.RememberMeLoginDuration)
+                    //    };
+                    //};
 
-                    // issue authentication cookie with subject ID and username
-                    var isuser = new IdentityServerUser(user.SubjectId)
-                    {
-                        DisplayName = user.Username
-                    };
+                    //// issue authentication cookie with subject ID and username
+                    //var isuser = new IdentityServerUser(user.SubjectId)
+                    //{
+                    //    DisplayName = user.Username
+                    //};
 
-                    await HttpContext.SignInAsync(isuser, props);
+                    //await HttpContext.SignInAsync(isuser, props);
 
                     if (context != null)
                     {
@@ -164,7 +178,7 @@ namespace IdentityServerHost.Quickstart.UI
                     }
                 }
 
-                await _events.RaiseAsync(new UserLoginFailureEvent(model.Username, "invalid credentials", clientId:context?.Client.ClientId));
+                await _events.RaiseAsync(new UserLoginFailureEvent(model.PhoneNumber, "invalid credentials", clientId: context?.Client.ClientId));
                 ModelState.AddModelError(string.Empty, AccountOptions.InvalidCredentialsErrorMessage);
             }
 
@@ -173,7 +187,7 @@ namespace IdentityServerHost.Quickstart.UI
             return View(vm);
         }
 
-        
+
         /// <summary>
         /// Show logout page
         /// </summary>
@@ -249,7 +263,7 @@ namespace IdentityServerHost.Quickstart.UI
                 {
                     EnableLocalLogin = local,
                     ReturnUrl = returnUrl,
-                    Username = context?.LoginHint,
+                    PhoneNumber = context?.LoginHint,
                 };
 
                 if (!local)
@@ -290,7 +304,7 @@ namespace IdentityServerHost.Quickstart.UI
                 AllowRememberLogin = AccountOptions.AllowRememberLogin,
                 EnableLocalLogin = allowLocal && AccountOptions.AllowLocalLogin,
                 ReturnUrl = returnUrl,
-                Username = context?.LoginHint,
+                PhoneNumber = context?.LoginHint,
                 ExternalProviders = providers.ToArray()
             };
         }
@@ -298,7 +312,7 @@ namespace IdentityServerHost.Quickstart.UI
         private async Task<LoginViewModel> BuildLoginViewModelAsync(LoginInputModel model)
         {
             var vm = await BuildLoginViewModelAsync(model.ReturnUrl);
-            vm.Username = model.Username;
+            vm.PhoneNumber = model.PhoneNumber;
             vm.RememberLogin = model.RememberLogin;
             return vm;
         }
@@ -363,6 +377,50 @@ namespace IdentityServerHost.Quickstart.UI
             }
 
             return vm;
+        }
+
+        //register
+        [HttpGet]
+        public IActionResult Register()
+        {
+            return View(new RegisterUserModel());
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Register(RegisterUserModel userModel)
+        {
+            if (!ModelState.IsValid)
+                return View(userModel);
+
+            var crmResponse = await _CRMProxy.CreateCRMUser(new CRMCreateUserRequest()
+            {
+                Email = userModel.Email,
+                PhoneNumber = userModel.PhoneNumber
+            });
+
+            var someEntityId = crmResponse.UserID;
+
+            var user = new ApplicationUser()
+            {
+                WhatEverEntity = someEntityId,
+                Email = userModel.Email,
+                UserName = "_" + userModel.PhoneNumber,
+                PhoneNumber = userModel.PhoneNumber
+            };
+            var result = await _userManager.CreateAsync(user, userModel.Password);
+            if (result.Succeeded)
+            {
+                await _userManager.AddToRoleAsync(user, "client");
+                return Redirect("login");
+            }
+            else
+            {
+                var resulError = result.Errors.FirstOrDefault();
+                if (resulError != null)
+                    ModelState.AddModelError(resulError.Code, resulError.Description);
+                return View();
+            }
+
         }
     }
 }

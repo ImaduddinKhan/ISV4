@@ -10,7 +10,7 @@ namespace IdentityServer.Models
         public string Email { get; set; }
 
         [Required]
-        [RegularExpression("^([0][3][0-9]{8})$", ErrorMessage = "Invalid Mobile Number")]
+        [RegularExpression("^([0][3][0-9])$", ErrorMessage = "Invalid Mobile Number")]
         public string PhoneNumber { get; set; }
 
         [DataType(DataType.Password)]
