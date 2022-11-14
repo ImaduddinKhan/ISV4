@@ -82,9 +82,6 @@ namespace IdentityServerHost.Quickstart.UI
             return View(vm);
         }
 
-        /// <summary>
-        /// Handle postback from username/password login
-        /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginInputModel model, string button)
@@ -125,9 +122,9 @@ namespace IdentityServerHost.Quickstart.UI
                 var res = await _signInManager.PasswordSignInAsync("_" + model.PhoneNumber, model.Password, model.RememberLogin, lockoutOnFailure: true);
                 if (res.Succeeded)
                 {
-                    var user = _userManager.FindByNameAsync("_" + model.PhoneNumber);
+                    var user = await _userManager.FindByNameAsync("_" + model.PhoneNumber);
                     if (user != null)
-                    await _events.RaiseAsync(new UserLoginSuccessEvent(user.Result.UserName, user.Result.Id, user.Result.UserName, clientId: context?.Client.ClientId));
+                    await _events.RaiseAsync(new UserLoginSuccessEvent(user.UserName, user.Id, user.UserName, clientId: context?.Client.ClientId));
 
                     // only set explicit expiration here if user chooses "remember me". 
                     // otherwise we rely upon expiration configured in cookie middleware.
